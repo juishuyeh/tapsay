@@ -8,6 +8,10 @@ Hotkey → 錄音 → STT → LLM 整理 → 剪貼簿 → 自動貼上
 
 常駐背景，只有一個 menu bar / tray 圖示，沒有主視窗。
 
+> **iPhone / iPad / 原生 macOS 版**在 [`apple/`](apple/README.md)：SwiftUI 重寫，
+> 一樣可以自由設定 Endpoint 與模型，iOS 上以「TapSay 鍵盤」在任何 App 裡輸入。
+> 本頁說明的是 Python 版（macOS + Windows）。
+
 ## 下載
 
 [**Releases**](../../releases/latest) 有打包好的版本，不需要裝 Python：
