@@ -1,0 +1,138 @@
+# XcodeGen 專案定義。產生 Xcode 專案：
+#   brew install xcodegen && cd apple && xcodegen generate && open TapSay.xcodeproj
+name: TapSay
+options:
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+configFiles:
+  Debug: Signing.xcconfig
+  Release: Signing.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.3.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    GENERATE_INFOPLIST_FILE: NO
+
+packages:
+  TapSayKit:
+    path: Packages/TapSayKit
+
+targets:
+  TapSay-macOS:
+    type: application
+    platform: macOS
+    sources:
+      - Shared
+      - macOS
+    dependencies:
+      - package: TapSayKit
+    info:
+      path: macOS/Info.plist
+      properties:
+        CFBundleDisplayName: TapSay
+        CFBundleName: TapSay
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSUIElement: true  # 只待在 menu bar，不佔 Dock
+        LSApplicationCategoryType: public.app-category.productivity
+        NSMicrophoneUsageDescription: TapSay 需要麥克風來錄下你說的話，轉成文字。
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true  # 允許 http:// 的本機或內網 endpoint（Ollama、LiteLLM…）
+    entitlements:
+      path: macOS/TapSay.entitlements
+      properties:
+        com.apple.security.device.audio-input: true
+    settings:
+      base:
+        PRODUCT_NAME: TapSay
+        PRODUCT_BUNDLE_IDENTIFIER: $(TAPSAY_BUNDLE_ID)
+        ENABLE_HARDENED_RUNTIME: YES
+        COMBINE_HIDPI_IMAGES: YES
+    scheme: {}
+
+  TapSay-iOS:
+    type: application
+    platform: iOS
+    sources:
+      - Shared
+      - iOS
+    dependencies:
+      - package: TapSayKit
+      - target: TapSayKeyboard
+    info:
+      path: iOS/Info.plist
+      properties:
+        CFBundleDisplayName: TapSay
+        CFBundleName: TapSay
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        TapSayAppGroup: $(TAPSAY_APP_GROUP)
+        NSMicrophoneUsageDescription: TapSay 需要麥克風來錄下你說的話，轉成文字。
+        UIBackgroundModes: [audio]  # 鍵盤模式：App 在背景代為錄音
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        CFBundleURLTypes:
+          - CFBundleURLName: $(TAPSAY_BUNDLE_ID)
+            CFBundleURLSchemes: [tapsay]
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+    entitlements:
+      path: iOS/TapSay.entitlements
+      properties:
+        com.apple.security.application-groups: [$(TAPSAY_APP_GROUP)]
+    settings:
+      base:
+        PRODUCT_NAME: TapSay
+        PRODUCT_BUNDLE_IDENTIFIER: $(TAPSAY_BUNDLE_ID)
+        TARGETED_DEVICE_FAMILY: "1,2"  # iPhone + iPad
+        SUPPORTS_MACCATALYST: NO
+    scheme: {}
+
+  TapSayKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Keyboard
+    dependencies:
+      - package: TapSayKit
+    info:
+      path: Keyboard/Info.plist
+      properties:
+        CFBundleDisplayName: TapSay
+        CFBundleName: TapSayKeyboard
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        TapSayAppGroup: $(TAPSAY_APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.keyboard-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
+          NSExtensionAttributes:
+            IsASCIICapable: false
+            PrefersRightToLeft: false
+            PrimaryLanguage: zh-Hant
+            RequestsOpenAccess: true  # 讀 App Group 的共享資料需要「完整取用」
+    entitlements:
+      path: Keyboard/TapSayKeyboard.entitlements
+      properties:
+        com.apple.security.application-groups: [$(TAPSAY_APP_GROUP)]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(TAPSAY_BUNDLE_ID).keyboard
+        TARGETED_DEVICE_FAMILY: "1,2"
+        APPLICATION_EXTENSION_API_ONLY: YES

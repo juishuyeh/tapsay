@@ -1,0 +1,11 @@
+# xcodegen generate 產生的檔案
+TapSay.xcodeproj/
+macOS/Info.plist
+macOS/TapSay.entitlements
+iOS/Info.plist
+iOS/TapSay.entitlements
+Keyboard/Info.plist
+Keyboard/TapSayKeyboard.entitlements
+build/
+.build/
+.swiftpm/

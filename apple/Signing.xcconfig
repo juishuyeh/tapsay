@@ -1,0 +1,9 @@
+// 自己建置時只需要改這個檔案。
+//
+// DEVELOPMENT_TEAM：Xcode → Settings → Accounts 裡看得到的 Team ID（10 碼）。留白＝不簽章（CI 用）。
+// TAPSAY_BUNDLE_ID：Bundle ID 在 Apple 是全域唯一的，請換成你自己的（例如 com.yourname.tapsay）。
+// TAPSAY_APP_GROUP：iOS App 與鍵盤共用資料用，必須是 group. 開頭，並在 Apple Developer 網站註冊。
+
+DEVELOPMENT_TEAM =
+TAPSAY_BUNDLE_ID = io.github.tapsay
+TAPSAY_APP_GROUP = group.io.github.tapsay
