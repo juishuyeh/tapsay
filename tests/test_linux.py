@@ -129,3 +129,14 @@ def test_toggle_cli_without_instance(sock):
     proc = subprocess.run([sys.executable, "-m", "tapsay", "--toggle"], env=env, capture_output=True, text=True)
     assert proc.returncode == 1
     assert "沒有在執行" in proc.stderr
+
+
+def test_ipc_is_noop_where_unsupported(monkeypatch):
+    """Windows 沒有 AF_UNIX / os.getuid：建立與啟動伺服器都不能出錯。"""
+    monkeypatch.setattr(ipc, "SUPPORTED", False)
+    monkeypatch.delattr(os, "getuid")
+    server = ipc.Server({"toggle": lambda: None})
+    server.start()
+    server.stop()
+    with pytest.raises(ConnectionError):
+        ipc.send("toggle")

@@ -64,12 +64,13 @@ class Server:
 
     def __init__(self, handlers: dict) -> None:
         self.handlers = {"ping": lambda: "pong", **handlers}
-        self.path = socket_path()
+        self.path: Path | None = None  # Windows 沒有 os.getuid()，所以到 start() 才決定
         self._sock: socket.socket | None = None
 
     def start(self) -> None:
         if not SUPPORTED:
             return
+        self.path = socket_path()
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         if self.path.exists():
             try:
@@ -95,7 +96,8 @@ class Server:
         try:
             sock.close()
         finally:
-            self.path.unlink(missing_ok=True)
+            if self.path is not None:
+                self.path.unlink(missing_ok=True)
 
     def _serve(self) -> None:
         while self._sock is not None:
