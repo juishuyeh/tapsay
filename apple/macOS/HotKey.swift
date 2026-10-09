@@ -71,13 +71,13 @@ extension HotkeySpec {
         let layout = Unmanaged<CFData>.fromOpaque(ptr).takeUnretainedValue() as Data
         var dead: UInt32 = 0
         var chars = [UniChar](repeating: 0, count: 4)
-        var length: UniCharCount = 0
+        var length = 0
         let status = layout.withUnsafeBytes { raw -> OSStatus in
             guard let base = raw.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return -1 }
             return UCKeyTranslate(base, UInt16(code), UInt16(kUCKeyActionDisplay), 0, UInt32(LMGetKbdType()),
                                   OptionBits(kUCKeyTranslateNoDeadKeysBit), &dead, 4, &length, &chars)
         }
         guard status == noErr, length > 0 else { return "#\(code)" }
-        return String(utf16CodeUnits: chars, count: Int(length)).uppercased()
+        return String(utf16CodeUnits: chars, count: length).uppercased()
     }
 }
