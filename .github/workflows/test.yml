@@ -1,0 +1,42 @@
+name: Test
+
+on:
+  push:
+    branches: ["**"]
+    paths: ["src/**", "tests/**", "scripts/**", "pyproject.toml", "uv.lock", ".github/workflows/test.yml"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-24.04
+    env:
+      UV_PYTHON_PREFERENCE: only-managed
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 系統套件（與 scripts/install-linux.sh 相同）
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libportaudio2 xclip libnotify-bin xvfb xdotool \
+            gir1.2-ayatanaappindicator3-0.1 libgirepository-2.0-dev libcairo2-dev pkg-config
+
+      - name: 安裝 uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - run: uv sync
+
+      - name: 單元測試
+        run: uv run pytest -q
+
+      - name: 每個模組在 X11 下都載入得了
+        run: |
+          Xvfb :99 & sleep 1
+          for m in config api recorder paste hotkey notify tray ui app linux ipc; do
+            DISPLAY=:99 uv run python -c "import tapsay.$m" || exit 1
+          done
+
+      - name: 安裝腳本語法
+        run: bash -n scripts/install-linux.sh

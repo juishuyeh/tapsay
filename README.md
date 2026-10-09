@@ -16,6 +16,7 @@ Hotkey → 錄音 → STT → LLM 整理 → 剪貼簿 → 自動貼上
 |---|---|---|
 | macOS (Apple Silicon) | `TapSay-macOS-arm64.zip` | 解壓縮 → 拖進「應用程式」→ 右鍵「打開」 |
 | Windows (x64) | `TapSay-Windows-x64.zip` | 解壓縮 → 執行 `TapSay.exe` → SmartScreen 選「仍要執行」 |
+| Ubuntu / Debian | 用安裝腳本（見下方「Ubuntu」） | 一行指令安裝，自動加入應用程式選單與開機啟動 |
 
 兩邊都沒有付費簽章，所以第一次要手動放行一次，之後正常。macOS 還要到
 「系統設定 → 隱私權與安全性」開**麥克風**與**輔助使用**給 TapSay。
@@ -29,9 +30,53 @@ uv sync
 uv run tapsay            # 常駐執行，出現 menu bar / tray 圖示
 uv run tapsay --settings # 只開設定視窗
 uv run tapsay --no-tray  # 不顯示圖示，只註冊快捷鍵（除錯用）
+uv run tapsay --toggle   # 讓執行中的 TapSay 開始 / 停止錄音（macOS / Linux）
+uv run pytest            # 測試
 ```
 
+Linux 上 `uv sync` 會編譯 PyGObject（系統匣圖示用），需要先裝
+`libgirepository-2.0-dev libcairo2-dev pkg-config`（安裝腳本會處理）。
+
 第一次執行請先開設定視窗填 STT / LLM 的 Endpoint、API Key、Model。
+
+## Ubuntu
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/juishuyeh/tapsay/main/scripts/install-linux.sh | bash
+```
+
+腳本會用 apt 裝系統套件（PortAudio、剪貼簿工具、系統匣圖示需要的 AppIndicator），
+再用 `uv` 安裝 `tapsay` 指令，並建立「TapSay」「TapSay 設定」兩個應用程式選單項目與開機自動啟動。
+已經 clone 原始碼的話，在資料夾裡執行 `./scripts/install-linux.sh` 會安裝這份原始碼。
+
+**X11 與 Wayland 的差別**（Ubuntu 22.04 起預設是 Wayland，登入畫面右下角齒輪可以切換）
+
+| | X11 | Wayland |
+|---|---|---|
+| 全域快捷鍵 | TapSay 自己監聽，跟 macOS / Windows 一樣 | 交給 GNOME：TapSay 會在「設定 → 鍵盤 → 自訂快捷鍵」加一筆，按下時執行 `tapsay --toggle` |
+| 自動貼上 | 直接送出 Ctrl+V | 需要 [ydotool](https://github.com/ReimuNotMoe/ydotool)；沒有的話結果只放剪貼簿，自己按 Ctrl+V |
+| 連擊快捷鍵 `double:<ctrl>` | ✓ | ✗ |
+
+Wayland 不讓一般程式收到全域按鍵、也不讓它模擬按鍵，這是 Wayland 的安全設計，任何程式都一樣。
+GNOME 快捷鍵的設定有三種方式，擇一即可：安裝腳本會自動設定、系統匣選單「設定系統快捷鍵（Wayland）」、
+或執行 `tapsay --setup-shortcut`。之後在設定視窗改快捷鍵，TapSay 下次啟動時會自動同步給 GNOME。
+其他桌面環境（KDE、Sway…）請自行把快捷鍵綁到 `tapsay --toggle`。
+
+Wayland 下要自動貼上：
+
+```bash
+sudo apt install ydotool
+sudo usermod -aG input $USER          # ydotool 要能寫 /dev/uinput，加完要重新登入
+systemctl --user enable --now ydotool  # 有些版本沒附 user service，就自己在背景跑 ydotoold
+```
+
+**其他注意事項**
+
+- 系統匣圖示：Ubuntu 預設就有 AppIndicator 擴充套件。純 GNOME（Fedora 等）要另外裝
+  「AppIndicator and KStatusNotifierItem Support」擴充，否則看不到圖示，但快捷鍵照樣能用。
+- API Key 存在 GNOME 鑰匙圈（Secret Service）。
+- 終端機裡貼上是 Ctrl+Shift+V，所以自動貼上對終端機無效，結果會留在剪貼簿。
+- 重複啟動會被擋下（開機自動啟動之後又手動打開也沒關係）。
 
 ## 使用
 
@@ -127,6 +172,7 @@ Endpoint 填 base URL（例如 `https://api.openai.com/v1`），程式自己接 
 
 - macOS：`~/Library/Application Support/TapSay/config.toml`
 - Windows：`%APPDATA%\TapSay\config.toml`
+- Linux：`~/.config/tapsay/config.toml`
 
 API Key **不寫進 config.toml**，存在 macOS Keychain / Windows 認證管理員（service 名稱 `tapsay`）。
 
@@ -177,6 +223,13 @@ API Key **不寫進 config.toml**，存在 macOS Keychain / Windows 認證管理
 - Menu bar 圖示與狀態換色、設定視窗、設定檔 TOML round-trip
 
 尚未在 Windows 上實機驗證（沒有 Windows 環境）；所有相依套件都有官方 Windows 支援。
+
+## 已在 Ubuntu 24.04 測試（虛擬螢幕 Xvfb + 虛擬麥克風）
+
+- X11：快捷鍵 → 錄音 → STT → LLM → 剪貼簿 → 自動貼進輸入框，完整流程通過（對假的 API 服務）
+- Wayland 模式：`tapsay --toggle` 觸發錄音、`--setup-shortcut` 寫入 GNOME 設定、改用 ydotool 貼上
+  （gsettings 與 ydotool 是模擬的，**尚未在真的 Ubuntu 桌面上驗證**）
+- 系統匣以 AppIndicator 後端啟動、設定視窗、安裝腳本、重複啟動防護
 
 ## 打包成 .app / .exe
 
@@ -271,7 +324,9 @@ src/tapsay/
 ├── notify.py     系統通知
 ├── tray.py       menu bar / tray 圖示
 ├── ui.py         設定視窗（tkinter）
-└── config.py     config.toml + keyring
+├── config.py     config.toml + keyring
+├── ipc.py        tapsay --toggle 與防止重複啟動（Unix socket）
+└── linux.py      Wayland 偵測、GNOME 快捷鍵、Wayland 自動貼上
 ```
 
 ## 疑難排解

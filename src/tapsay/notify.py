@@ -5,6 +5,8 @@ from __future__ import annotations
 import subprocess
 import sys
 
+from .linux import notify_send
+
 _notifier = None  # 由 tray 設定
 
 
@@ -31,6 +33,8 @@ def _fallback(message: str, title: str) -> None:
                 title.replace("\\", "\\\\").replace('"', '\\"'),
             )
             subprocess.Popen(["osascript", "-e", script])
+        elif sys.platform.startswith("linux") and notify_send(message, title):
+            pass
         else:
             print(f"[{title}] {message}", file=sys.stderr)
     except Exception:

@@ -9,7 +9,7 @@ import threading
 import pystray
 from PIL import Image, ImageDraw
 
-from . import hotkey, notify
+from . import hotkey, ipc, linux, notify
 from .app import ERROR, IDLE, PROCESSING, RECORDING, SUCCESS, TapSay
 
 COLORS = {
@@ -67,6 +67,12 @@ def open_settings(app: TapSay) -> None:
 
 def run() -> None:
     app = TapSay()
+    try:
+        app.start_ipc()
+    except ipc.AlreadyRunning:
+        notify.notify("TapSay 已經在執行了")
+        print("[tapsay] 已經有一個 TapSay 在執行，這次不再啟動", file=sys.stderr)
+        return
 
     menu_items = [
         pystray.MenuItem("開始 / 停止錄音", lambda: app.toggle()),
@@ -75,6 +81,10 @@ def run() -> None:
     if sys.platform == "darwin":
         menu_items.append(
             pystray.MenuItem("輔助使用權限…", lambda: hotkey.request_trust())
+        )
+    if linux.is_wayland() and linux.is_gnome():
+        menu_items.append(
+            pystray.MenuItem("設定系統快捷鍵（Wayland）", lambda: app.setup_system_shortcut())
         )
     menu_items.append(pystray.MenuItem("結束 TapSay", lambda: icon.stop()))
 
@@ -90,11 +100,13 @@ def run() -> None:
         icon.title = LABELS.get(state, LABELS[IDLE])
 
     app.on_state = on_state
-    notify.set_notifier(lambda message, title: icon.notify(message, title))
+    if not linux.IS_LINUX:
+        # Linux 的 AppIndicator 後端不一定支援通知，直接走 notify-send 比較可靠
+        notify.set_notifier(lambda message, title: icon.notify(message, title))
 
     app.start_hotkey()
     print(f"[tapsay] 已啟動，快捷鍵 {app.config.get('hotkey', '')}")
     try:
         icon.run()
     finally:
-        app.recorder.cancel()
+        app.shutdown()

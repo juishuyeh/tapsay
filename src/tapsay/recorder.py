@@ -5,7 +5,11 @@ from __future__ import annotations
 import io
 import wave
 
-import sounddevice as sd
+try:
+    import sounddevice as sd
+except OSError as _exc:  # Linux 沒裝 PortAudio 時 import 就會失敗；延到錄音時才報錯，程式照樣能開
+    sd = None
+    _IMPORT_ERROR = _exc
 
 SAMPLE_RATE = 16000
 CHANNELS = 1
@@ -19,7 +23,7 @@ class RecorderError(RuntimeError):
 
 class Recorder:
     def __init__(self) -> None:
-        self._stream: sd.RawInputStream | None = None
+        self._stream = None
         self._chunks: list[bytes] = []
 
     @property
@@ -29,6 +33,10 @@ class Recorder:
     def start(self) -> None:
         if self._stream is not None:
             return
+        if sd is None:
+            raise RecorderError(
+                f"找不到 PortAudio（{_IMPORT_ERROR}）：請執行 sudo apt install libportaudio2"
+            )
         self._chunks = []
 
         def callback(indata, frames, time_info, status):

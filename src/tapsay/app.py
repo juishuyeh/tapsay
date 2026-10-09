@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import shlex
 import threading
 import time
 
-from . import api, config, notify, paste
+from . import api, config, ipc, linux, notify, paste
 from . import hotkey as hotkey_mod
 from .recorder import Recorder, RecorderError
 
@@ -25,7 +26,8 @@ class TapSay:
         self.state = IDLE
         self.on_state = lambda state: None  # 由 tray 覆寫
         self._lock = threading.Lock()
-        self._hotkey: HotkeyListener | None = None
+        self._hotkey = None
+        self._ipc: ipc.Server | None = None
 
     # ---- 狀態 ----
 
@@ -49,8 +51,29 @@ class TapSay:
 
     # ---- 快捷鍵 ----
 
+    def start_ipc(self) -> None:
+        """讓 `tapsay --toggle` 能控制這個行程。已經有一份在跑時丟 ipc.AlreadyRunning。"""
+        self._ipc = ipc.Server({"toggle": self.toggle})
+        try:
+            self._ipc.start()
+        except ipc.AlreadyRunning:
+            self._ipc = None
+            raise
+        except OSError as exc:  # 只是少了 --toggle，不影響主要功能
+            self._ipc = None
+            print(f"[tapsay] 無法建立 {ipc.socket_path()}：{exc}")
+
+    def shutdown(self) -> None:
+        self.recorder.cancel()
+        if self._ipc is not None:
+            self._ipc.stop()
+            self._ipc = None
+
     def start_hotkey(self) -> None:
         combo = self.config.get("hotkey", "")
+        if linux.is_wayland():
+            self._start_wayland_hotkey(combo)
+            return
         try:
             self._hotkey = hotkey_mod.create_listener(
                 combo, self.toggle, int(self.config.get("double_tap_ms", 400))
@@ -69,6 +92,32 @@ class TapSay:
             )
             hotkey_mod.request_trust()
             self._watch_for_trust()
+
+    def _start_wayland_hotkey(self, combo: str) -> None:
+        """Wayland 收不到全域按鍵，改由桌面環境執行 `tapsay --toggle`。"""
+        if linux.is_gnome() and linux.gnome_shortcut_installed():
+            try:
+                linux.install_gnome_shortcut(combo)  # 同步設定視窗改過的按鍵
+            except Exception as exc:
+                notify.notify(f"更新 GNOME 快捷鍵失敗：{exc}")
+            return
+        if linux.is_gnome():
+            notify.notify("Wayland 下要由 GNOME 代為處理快捷鍵：請從圖示選單點「設定系統快捷鍵」")
+        else:
+            notify.notify(
+                "Wayland 下收不到全域按鍵：請在桌面環境的快捷鍵設定綁定指令 "
+                f"`{shlex.join(linux.toggle_command())}`"
+            )
+
+    def setup_system_shortcut(self) -> None:
+        """選單「設定系統快捷鍵」：GNOME 直接寫入自訂快捷鍵。"""
+        combo = self.config.get("hotkey", "")
+        try:
+            binding = linux.install_gnome_shortcut(combo)
+        except Exception as exc:
+            notify.notify(f"設定失敗：{exc}")
+            return
+        notify.notify(f"已在 GNOME 設定快捷鍵 {binding}，按下就會開始 / 停止錄音")
 
     def _watch_for_trust(self) -> None:
         """使用者在系統設定勾選之後自動把監聽器重開，不必叫他重啟程式。"""
